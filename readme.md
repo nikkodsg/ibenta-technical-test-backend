@@ -45,7 +45,7 @@ Bonus: If you can write tests please do so.
     1. `lastName` is required
     1. `email` is required and should be a proper email format
     1. `password` is required and should be encoded before saving in the database. This field should also be omitted when returning from the API.
-1. Create an endpoint that will return the response from this URL. `http://authentication-service.staging.ibenta.com/actuator/health`.
+1. Create an endpoint that will return the response from this URL. `http://authentication-service-jx-staging.gitops.ibenta.com/actuator/health`.
 1. Write unit/integration to cover as much as you can.
 
 Bonus: Implement a PATCH update on user (Partial update).
