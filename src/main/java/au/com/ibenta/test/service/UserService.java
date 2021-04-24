@@ -5,8 +5,8 @@ import au.com.ibenta.test.persistence.UserEntity;
 import au.com.ibenta.test.persistence.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Service
 public class UserService {
@@ -17,36 +17,39 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public UserEntity create(UserEntity userEntity) {
-        return userRepository.save(userEntity);
+    public Mono<UserEntity> create(UserEntity userEntity) {
+        return Mono.just(userRepository.save(userEntity));
     }
 
-    public UserEntity get(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(id));
+    public Mono<UserEntity> get(Long id) {
+        return Mono.justOrEmpty(userRepository.findById(id))
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(id)));
     }
 
-    public UserEntity update(UserEntity userEntity) {
-        UserEntity userToUpdate = userRepository.findById(userEntity.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(userEntity.getId()));
+    public Mono<UserEntity> update(UserEntity userEntity) {
+        return Mono.justOrEmpty(userRepository.findById(userEntity.getId()))
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(userEntity.getId())))
+                .flatMap(userToUpdate -> {
+                    userToUpdate.setEmail(userEntity.getEmail());
+                    userToUpdate.setFirstName(userEntity.getFirstName());
+                    userToUpdate.setLastName(userEntity.getLastName());
+                    userToUpdate.setPassword(userEntity.getPassword());
 
-        userToUpdate.setEmail(userEntity.getEmail());
-        userToUpdate.setFirstName(userEntity.getFirstName());
-        userToUpdate.setLastName(userEntity.getLastName());
-        userToUpdate.setPassword(userEntity.getPassword());
-
-        return userRepository.save(userToUpdate);
+                    return Mono.just(userRepository.save(userEntity));
+                });
     }
 
-    public void delete(Long id) {
+    public Mono<Void> delete(Long id) {
         if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException(id);
+            return Mono.error(new ResourceNotFoundException(id));
         }
 
         userRepository.deleteById(id);
+
+        return Mono.empty();
     }
 
-    public List<UserEntity> list() {
-        return userRepository.findAll();
+    public Flux<UserEntity> list() {
+        return Flux.fromIterable(userRepository.findAll());
     }
 }
