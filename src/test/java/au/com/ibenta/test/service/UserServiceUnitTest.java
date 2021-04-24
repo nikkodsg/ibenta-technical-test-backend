@@ -1,14 +1,14 @@
 package au.com.ibenta.test.service;
 
 import au.com.ibenta.test.exception.ResourceNotFoundException;
+import au.com.ibenta.test.model.User;
 import au.com.ibenta.test.persistence.UserEntity;
 import au.com.ibenta.test.persistence.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
+import org.mockito.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -21,47 +21,91 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @TestMethodOrder(OrderAnnotation.class)
-public class UserServiceTest {
+public class UserServiceUnitTest {
 
     @Mock
     UserRepository userRepository;
 
+    @Spy
+    PasswordEncoder passwordEncoder;
+
     @InjectMocks
     UserService userService;
 
-    private UserEntity userStub;
+    private User userStub;
+    private User updatedUserStub;
+    private UserEntity userEntityStub;
+    private UserEntity updatedUserEntityStub;
+
+    final long ID = 1L;
+    final String FIRST_NAME = "Nikko";
+    final String LAST_NAME = "Dasig";
+    final String EMAIL = "nikkodasig@gmail.com";
+    final String PASSWORD = "password";
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.initMocks(this);
 
-        userStub = new UserEntity();
-        userStub.setId(1L);
-        userStub.setFirstName("Nikko");
-        userStub.setLastName("Dasig");
-        userStub.setEmail("nikkodasig@gmail.com");
-        userStub.setPassword("password");
+        userStub = User.builder()
+                .id(ID)
+                .firstName(FIRST_NAME)
+                .lastName(LAST_NAME)
+                .email(EMAIL)
+                .password(PASSWORD)
+                .build();
+
+        userEntityStub = UserEntity.builder()
+                .id(ID)
+                .firstName(FIRST_NAME)
+                .lastName(LAST_NAME)
+                .email(EMAIL)
+                .password(PASSWORD)
+                .build();
+
+        updatedUserStub = User.builder()
+                .id(userStub.getId())
+                .firstName("NIKKO")
+                .lastName("DASIG")
+                .email("NIKKODASIG@GMAIL.COM")
+                .password(userStub.getPassword())
+                .build();
+
+        updatedUserEntityStub = UserEntity.builder()
+                .id(updatedUserStub.getId())
+                .firstName(updatedUserStub.getFirstName())
+                .lastName(updatedUserStub.getLastName())
+                .email(updatedUserStub.getEmail())
+                .password(updatedUserStub.getPassword())
+                .build();
     }
 
     @Test
     void testCreateNewUser() {
-        when(userRepository.save(any(UserEntity.class)))
-                .thenReturn(userStub);
+        final String ENCODED_PASSWORD = "encoded-password";
+        userEntityStub.setPassword(ENCODED_PASSWORD);
 
-        Mono<UserEntity> newUserMono = userService.create(userStub);
+        when(userRepository.save(any(UserEntity.class)))
+                .thenReturn(userEntityStub);
+
+        Mono<User> newUserMono = userService.create(userStub);
         newUserMono.subscribe(newUser -> {
-            assertEquals(newUser, userStub);
+            assertEquals(newUser.getId(), ID);
+            assertEquals(newUser.getFirstName(), userStub.getFirstName());
+            assertEquals(newUser.getLastName(), userStub.getLastName());
+            assertEquals(newUser.getEmail(), userStub.getEmail());
         });
 
         verify(userRepository, times(1)).save(any(UserEntity.class));
+        verify(passwordEncoder, times(1)).encode(argThat(arg -> arg.equals(PASSWORD)));
     }
 
     @Test
     void testGetUser() {
         when(userRepository.findById(1L))
-                .thenReturn(Optional.of(userStub));
+                .thenReturn(Optional.of(userEntityStub));
 
-        Mono<UserEntity> userMono = userService.get(1L);
+        Mono<User> userMono = userService.get(1L);
         StepVerifier
                 .create(userMono)
                 .assertNext(foundUser -> assertEquals(foundUser, userStub))
@@ -77,7 +121,7 @@ public class UserServiceTest {
         when(userRepository.findById(userStub.getId()))
                 .thenReturn(Optional.empty());
 
-        Mono<UserEntity> userMono = userService.get(NOT_EXISTING_USER_ID);
+        Mono<User> userMono = userService.get(NOT_EXISTING_USER_ID);
         StepVerifier
                 .create(userMono)
                 .expectErrorMatches(ex -> ex instanceof ResourceNotFoundException
@@ -89,42 +133,31 @@ public class UserServiceTest {
 
     @Test
     void testUpdateUser() {
-        UserEntity updatedUserStub = new UserEntity();
-        updatedUserStub.setId(userStub.getId());
-        updatedUserStub.setFirstName(userStub.getFirstName());
-        updatedUserStub.setLastName(userStub.getFirstName());
-        updatedUserStub.setEmail("ndasig@gmail.com");
-        updatedUserStub.setPassword(userStub.getPassword());
-
         when(userRepository.findById(anyLong()))
-                .thenReturn(Optional.of(userStub));
+                .thenReturn(Optional.of(updatedUserEntityStub));
+        when(userRepository.save(any()))
+                .thenReturn(updatedUserEntityStub);
 
-        when(userRepository.save(any(UserEntity.class)))
-                .thenReturn(updatedUserStub);
-
-        Mono<UserEntity> updatedUserMono = userService.update(updatedUserStub);
+        Mono<User> updatedUserMono = userService.update(updatedUserStub);
         StepVerifier
                 .create(updatedUserMono)
-                .assertNext(updatedUser -> assertEquals(updatedUser, updatedUserStub))
+                .assertNext(updatedUser -> {
+                    assertEquals(updatedUser.getFirstName(), updatedUserStub.getFirstName());
+                    assertEquals(updatedUser.getLastName(), updatedUserStub.getLastName());
+                    assertEquals(updatedUser.getEmail(), updatedUserStub.getEmail());
+                })
                 .verifyComplete();
 
         verify(userRepository, times(1)).findById(anyLong());
-        verify(userRepository, times(1)).save(any(UserEntity.class));
+        verify(userRepository, times(1)).save(any());
     }
 
     @Test
     void testUpdateUserNotExists() {
-        UserEntity updatedUserStub = new UserEntity();
-        updatedUserStub.setId(2L);
-        updatedUserStub.setFirstName(userStub.getFirstName());
-        updatedUserStub.setLastName(userStub.getFirstName());
-        updatedUserStub.setEmail(userStub.getEmail());
-        updatedUserStub.setPassword(userStub.getPassword());
-
         when(userRepository.findById(anyLong()))
                 .thenReturn(Optional.empty());
 
-        Mono<UserEntity> userMono = userService.update(updatedUserStub);
+        Mono<User> userMono = userService.update(updatedUserStub);
         StepVerifier
                 .create(userMono)
                 .expectErrorMatches(ex -> ex instanceof ResourceNotFoundException
@@ -166,18 +199,19 @@ public class UserServiceTest {
 
     @Test
     void testGetAllUsers() {
-        UserEntity userStub2 = new UserEntity();
-        userStub2.setId(2L);
-        userStub2.setFirstName("Sheldon");
-        userStub2.setLastName("Cooper");
-        userStub2.setEmail("sheldon.cooper@gmail.com");
-        userStub2.setPassword("password123");
+        UserEntity userEntityStub2 = UserEntity.builder()
+                .id(2L)
+                .firstName("Sheldon")
+                .lastName("Cooper")
+                .email("sheldon.cooper@gmail.com")
+                .password("password123")
+                .build();
 
-        List<UserEntity> usersStub = Arrays.asList(userStub, userStub2);
+        List<UserEntity> usersStub = Arrays.asList(userEntityStub, userEntityStub2);
 
         when(userRepository.findAll()).thenReturn(usersStub);
 
-        Flux<UserEntity> usersFlux = userService.list();
+        Flux<User> usersFlux = userService.list();
         StepVerifier
                 .create(usersFlux)
                 .expectNextCount(2)

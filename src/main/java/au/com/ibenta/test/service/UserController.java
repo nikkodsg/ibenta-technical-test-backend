@@ -1,6 +1,6 @@
 package au.com.ibenta.test.service;
 
-import au.com.ibenta.test.persistence.UserEntity;
+import au.com.ibenta.test.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -21,21 +21,22 @@ public class UserController {
 
     @PostMapping
     @ResponseStatus(CREATED)
-    public Mono<UserEntity> create(@RequestBody UserEntity userEntity) {
-        return userService.create(userEntity);
+    public Mono<User> create(@RequestBody User user) {
+        return userService.create(user);
     }
 
     @GetMapping("/{id}")
     @ResponseStatus(OK)
-    public Mono<UserEntity> get(@PathVariable Long id) {
+    public Mono<User> get(@PathVariable Long id) {
         return userService.get(id);
     }
 
     @PutMapping("/{id}")
     @ResponseStatus(OK)
-    public Mono<UserEntity> update(@PathVariable Long id, @RequestBody UserEntity userEntity) {
-        userEntity.setId(id);
-        return userService.update(userEntity);
+    public Mono<User> update(@PathVariable Long id, @RequestBody User user) {
+        user.setId(id);
+        Mono<User> updatedUserMono = userService.update(user);
+        return updatedUserMono;
     }
 
     @DeleteMapping("/{id}")
@@ -46,7 +47,7 @@ public class UserController {
 
     @GetMapping
     @ResponseStatus(OK)
-    public Flux<UserEntity> list() {
+    public Flux<User> list() {
         return userService.list();
     }
 }

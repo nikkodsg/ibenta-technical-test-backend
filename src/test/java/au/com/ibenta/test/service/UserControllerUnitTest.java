@@ -1,6 +1,7 @@
 package au.com.ibenta.test.service;
 
 import au.com.ibenta.test.exception.ResourceNotFoundException;
+import au.com.ibenta.test.model.User;
 import au.com.ibenta.test.persistence.UserEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,10 +12,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
 import java.util.Arrays;
+
 import static org.mockito.Mockito.*;
 
-class UserControllerTest {
+class UserControllerUnitTest {
 
     @Mock
     private UserService userService;
@@ -24,7 +27,14 @@ class UserControllerTest {
 
     private WebTestClient webTestClient;
 
-    private UserEntity userStub;
+    private User userStub;
+    private UserEntity userEntityStub;
+
+    final long ID = 1L;
+    final String FIRST_NAME = "Nikko";
+    final String LAST_NAME = "Dasig";
+    final String EMAIL = "nikkodasig@gmail.com";
+    final String PASSWORD = "password";
 
     @BeforeEach
     void setUp() {
@@ -32,17 +42,26 @@ class UserControllerTest {
 
         webTestClient = WebTestClient.bindToController(userController).build();
 
-        userStub = new UserEntity();
-        userStub.setId(1L);
-        userStub.setFirstName("Nikko");
-        userStub.setLastName("Dasig");
-        userStub.setEmail("nikkodasig@gmail.com");
-        userStub.setPassword("password");
+        userStub = User.builder()
+                .id(ID)
+                .firstName(FIRST_NAME)
+                .lastName(LAST_NAME)
+                .email(EMAIL)
+                .password(PASSWORD)
+                .build();
+
+        userEntityStub = UserEntity.builder()
+                .id(ID)
+                .firstName(FIRST_NAME)
+                .lastName(LAST_NAME)
+                .email(EMAIL)
+                .password(PASSWORD)
+                .build();
     }
 
     @Test
-    void testCreateUserController() {
-        when(userService.create(any(UserEntity.class))).thenReturn(Mono.just(userStub));
+    void testCreateUser() {
+        when(userService.create(any())).thenReturn(Mono.just(userStub));
 
         webTestClient.post()
                 .uri("/api/users")
@@ -54,8 +73,7 @@ class UserControllerTest {
                 .jsonPath("$.id").isEqualTo(userStub.getId())
                 .jsonPath("$.firstName").isEqualTo(userStub.getFirstName())
                 .jsonPath("$.lastName").isEqualTo(userStub.getLastName())
-                .jsonPath("$.email").isEqualTo(userStub.getEmail())
-                .jsonPath("$.password").isEqualTo(userStub.getPassword());
+                .jsonPath("$.email").isEqualTo(userStub.getEmail());
     }
 
     @Test
@@ -71,8 +89,7 @@ class UserControllerTest {
                 .jsonPath("$.id").isEqualTo(userStub.getId())
                 .jsonPath("$.firstName").isEqualTo(userStub.getFirstName())
                 .jsonPath("$.lastName").isEqualTo(userStub.getLastName())
-                .jsonPath("$.email").isEqualTo(userStub.getEmail())
-                .jsonPath("$.password").isEqualTo(userStub.getPassword());
+                .jsonPath("$.email").isEqualTo(userStub.getEmail());
     }
 
     @Test
@@ -86,12 +103,14 @@ class UserControllerTest {
                 .uri("/api/users/{id}", NOT_EXISTING_USER_ID)
                 .exchange()
                 .expectStatus().isNotFound();
+
+        // verify(userService, times(1)).get(anyLong());
     }
 
     @Test
     void testUpdateUser() {
         userStub.setEmail("ndasig@gmail.com");
-        when(userService.update(userStub)).thenReturn(Mono.just(userStub));
+        when(userService.update(any())).thenReturn(Mono.just(userStub));
 
         webTestClient.put()
                 .uri("/api/users/{id}", userStub.getId())
@@ -103,8 +122,7 @@ class UserControllerTest {
                 .jsonPath("$.id").isEqualTo(userStub.getId())
                 .jsonPath("$.firstName").isEqualTo(userStub.getFirstName())
                 .jsonPath("$.lastName").isEqualTo(userStub.getLastName())
-                .jsonPath("$.email").isEqualTo(userStub.getEmail())
-                .jsonPath("$.password").isEqualTo(userStub.getPassword());
+                .jsonPath("$.email").isEqualTo(userStub.getEmail());
     }
 
     @Test
@@ -113,7 +131,7 @@ class UserControllerTest {
 
         userStub.setId(NOT_EXISTING_USER_ID);
 
-        when(userService.update(any(UserEntity.class)))
+        when(userService.update(any()))
                 .thenReturn(Mono.error(new ResourceNotFoundException(NOT_EXISTING_USER_ID)));
 
         webTestClient.put().uri("/api/users/{id}", NOT_EXISTING_USER_ID)
@@ -151,14 +169,15 @@ class UserControllerTest {
 
     @Test
     void testGetAllUsers() {
-        UserEntity userStub2 = new UserEntity();
-        userStub2.setId(2L);
-        userStub2.setFirstName("Sheldon");
-        userStub2.setLastName("Cooper");
-        userStub2.setEmail("sheldon.cooper@gmail.com");
-        userStub2.setPassword("password123");
+        User userStub2 = User.builder()
+                .id(2L)
+                .firstName("Sheldon")
+                .lastName("Cooper")
+                .email("sheldon.cooper@gmail.com")
+                .password("password123")
+                .build();
 
-        Flux<UserEntity> usersStub = Flux.fromIterable(Arrays.asList(userStub, userStub2));
+        Flux<User> usersStub = Flux.fromIterable(Arrays.asList(userStub, userStub2));
 
         when(userService.list()).thenReturn(usersStub);
 
